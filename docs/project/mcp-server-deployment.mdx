@@ -1,0 +1,125 @@
+---
+title: "MCP Deployment"
+description: "Deploy the kagi MCP server with GHCR, Docker Compose, and a reverse proxy."
+---
+
+# MCP Deployment
+
+The recommended deployment model for this repository is the HTTP MCP server in `env-session-token` mode.
+
+That means:
+
+- the server stores your `KAGI_SESSION_TOKEN` in its own environment
+- MCP clients authenticate with a separate `MCP_BEARER_TOKEN`
+- the underlying Kagi session token never needs to be copied into every client config
+
+## Published Image
+
+This fork publishes the MCP image to GHCR:
+
+```text
+ghcr.io/changsoonkim/kagi-cli-mcp:latest
+```
+
+If you publish from another fork, replace the owner portion with your GitHub account or org.
+
+## Required Environment
+
+- `KAGI_SESSION_TOKEN`: your Kagi session link or raw token
+- `MCP_BEARER_TOKEN`: the bearer token your MCP clients send on `initialize`
+
+Optional:
+
+- `KAGI_MCP_AUTH_MODE`: defaults to `env-session-token`
+- `PORT`: defaults to `3000`
+- `MCP_HOST`: defaults to `0.0.0.0`
+
+## Docker Run
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e KAGI_SESSION_TOKEN='https://kagi.com/search?token=...' \
+  -e MCP_BEARER_TOKEN='replace-with-a-long-random-token' \
+  ghcr.io/changsoonkim/kagi-cli-mcp:latest
+```
+
+Runtime endpoints:
+
+- MCP session transport: `POST`, `GET`, `DELETE /mcp`
+- health: `GET /healthz`
+
+## Docker Compose
+
+Example files live under `mcp-server/examples/`.
+
+1. Copy the example env file and fill in your values.
+2. Start the container from the repo root.
+
+```bash
+cp mcp-server/examples/mcp-server.env.example mcp-server/examples/mcp-server.env
+docker compose \
+  -f mcp-server/examples/docker-compose.yml \
+  --env-file mcp-server/examples/mcp-server.env \
+  up -d
+```
+
+The compose example includes:
+
+- `restart: unless-stopped`
+- a `/healthz` health check
+- the default GHCR image
+- `env-session-token` wiring
+
+## Reverse Proxy
+
+If the server is only for your own use, prefer putting it behind Tailscale, a VPN, or a private network first.
+
+If you expose it on the public internet:
+
+- terminate TLS at the proxy
+- keep `Authorization` and `mcp-session-id` headers intact
+- do not strip `DELETE` requests
+- do not enable aggressive buffering on `/mcp`
+
+Example proxy configs:
+
+- Caddy: `mcp-server/examples/Caddyfile`
+- Nginx: `mcp-server/examples/nginx.conf`
+
+## Client Auth Flow
+
+For `env-session-token` mode:
+
+1. The first `initialize` request must include `Authorization: Bearer <MCP_BEARER_TOKEN>`.
+2. The server returns an `mcp-session-id`.
+3. Follow-up `POST`, `GET`, and `DELETE` requests reuse that MCP session id.
+4. The server injects its configured `KAGI_SESSION_TOKEN` into the underlying CLI process.
+
+## Update Playbook
+
+When a new image is published:
+
+```bash
+docker compose \
+  -f mcp-server/examples/docker-compose.yml \
+  --env-file mcp-server/examples/mcp-server.env \
+  pull
+
+docker compose \
+  -f mcp-server/examples/docker-compose.yml \
+  --env-file mcp-server/examples/mcp-server.env \
+  up -d
+```
+
+After updating:
+
+- verify `GET /healthz` returns `{"ok":true}`
+- re-initialize one MCP client session
+- if Kagi auth fails, rotate `KAGI_SESSION_TOKEN` and restart the container
+
+## Troubleshooting
+
+- `401 invalid bearer token`: The client sent the wrong `Authorization` token on the first `initialize` request.
+- `400 missing MCP session id`: A follow-up request hit `/mcp` without the `mcp-session-id` header.
+- `404 unknown MCP session`: The server restarted or the session was closed. Run a fresh `initialize`.
+- Kagi command failures after startup: The MCP server authenticated correctly, but the stored `KAGI_SESSION_TOKEN` is invalid or expired.

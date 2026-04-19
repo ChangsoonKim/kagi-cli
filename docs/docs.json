@@ -130,6 +130,7 @@
               "project/development",
               "project/mcp-server-plan",
               "project/mcp-server-tools",
+              "project/mcp-server-deployment",
               "project/demos"
             ]
           },

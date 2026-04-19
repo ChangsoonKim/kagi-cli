@@ -1,0 +1,23 @@
+services:
+  kagi-mcp:
+    image: ${KAGI_MCP_IMAGE:-ghcr.io/changsoonkim/kagi-cli-mcp:latest}
+    container_name: kagi-mcp
+    restart: unless-stopped
+    environment:
+      KAGI_MCP_AUTH_MODE: env-session-token
+      KAGI_SESSION_TOKEN: ${KAGI_SESSION_TOKEN}
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN}
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then((res)=>process.exit(res.ok ? 0 : 1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

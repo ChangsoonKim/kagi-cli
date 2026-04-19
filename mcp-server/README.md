@@ -93,7 +93,7 @@ npm start
 - `kagi_news`
 - `kagi_smallweb`
 
-Not exposed in session-token-only HTTP mode:
+Not exposed in HTTP mode:
 
 - `kagi_fastgpt`
 - `kagi_enrich_web`
@@ -113,13 +113,32 @@ Run with the default `env-session-token` mode:
 docker run --rm -p 3000:3000 \
   -e KAGI_SESSION_TOKEN=your-kagi-session-token \
   -e MCP_BEARER_TOKEN=your-server-access-token \
-  kagi-cli-mcp
+  ghcr.io/changsoonkim/kagi-cli-mcp:latest
 ```
 
 Pull the published image from GHCR:
 
 ```bash
-docker pull ghcr.io/<your-github-owner>/kagi-cli-mcp:latest
+docker pull ghcr.io/changsoonkim/kagi-cli-mcp:latest
+```
+
+If you publish from another fork, replace `changsoonkim` with your GitHub owner.
+
+Example deployment files live under `mcp-server/examples/`:
+
+- `docker-compose.yml`
+- `mcp-server.env.example`
+- `Caddyfile`
+- `nginx.conf`
+
+Example compose launch:
+
+```bash
+cp mcp-server/examples/mcp-server.env.example mcp-server/examples/mcp-server.env
+docker compose \
+  -f mcp-server/examples/docker-compose.yml \
+  --env-file mcp-server/examples/mcp-server.env \
+  up -d
 ```
 
 Health endpoint:
@@ -140,3 +159,4 @@ POST /mcp
 - that means `.kagi.toml` resolution still follows the CLI's existing behavior
 - for one user across many clients, `env-session-token` is the recommended deployment model
 - for many users, keep this auth layer separate from the CLI and add a token store or OAuth-backed identity mapping on top
+- for public exposure, terminate TLS at a reverse proxy and preserve `Authorization` and `mcp-session-id` headers

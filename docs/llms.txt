@@ -38,6 +38,9 @@
 ## Project
 
 - [Development](https://kagi.micr.dev/project/development): Build, test, and maintain *kagi* from a source checkout.
+- [MCP Server Plan](https://kagi.micr.dev/project/mcp-server-plan): Execution plan for adding and maintaining the MCP adapter with minimal repo disruption.
+- [MCP Server Runtime](https://kagi.micr.dev/project/mcp-server-tools): Supported MCP tools, auth flow, and runtime behavior for the deployable MCP server.
+- [MCP Deployment](https://kagi.micr.dev/project/mcp-server-deployment): Deploy the MCP server with GHCR, Docker Compose, and reverse proxy examples.
 - [Demos](https://kagi.micr.dev/project/demos): Recorded terminal demos and how to regenerate them.
 - [Support and Contribution](https://kagi.micr.dev/project/support): Where to file issues, how to contribute safely, and what not to commit.
 - [Contributing](https://kagi.micr.dev/project/contributing): How to contribute to *kagi* CLI - bug reports, feature requests, documentation improvements, and code contributions.

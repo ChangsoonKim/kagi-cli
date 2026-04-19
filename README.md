@@ -151,6 +151,16 @@ notes:
 
 for the full command-to-token matrix, use the [`auth-matrix`](https://kagi.micr.dev/reference/auth-matrix) docs page.
 
+## MCP server
+
+this repo also ships a deployable MCP adapter under `mcp-server/`. the recommended home-server deployment is the HTTP runtime in `env-session-token` mode:
+
+- the server keeps `KAGI_SESSION_TOKEN` in its own environment
+- MCP clients use a separate `MCP_BEARER_TOKEN`
+- published container images for this fork live at `ghcr.io/changsoonkim/kagi-cli-mcp:latest`
+
+deployment examples live in `mcp-server/examples/`, and the detailed deployment guide is in the docs: [MCP deployment](https://kagi.micr.dev/project/mcp-server-deployment)
+
 ## command surface
 
 | command | purpose |
