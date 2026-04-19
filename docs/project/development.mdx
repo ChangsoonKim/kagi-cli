@@ -18,6 +18,17 @@ cargo run -- --help
 cargo test -q
 ```
 
+## MCP Server
+
+The repository also includes a standalone MCP adapter under `mcp-server/`.
+
+```bash
+cd mcp-server
+npm install
+npm run build
+npm test
+```
+
 Optional checks:
 
 ```bash
@@ -28,6 +39,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 ## Repo notes
 
 - core Rust implementation lives under `src/`
+- MCP adapter implementation lives under `mcp-server/`
 - release installers live under `scripts/`
 - npm wrapper lives under `npm/`
 - recorded demo assets and regeneration notes live in the existing repo docs material

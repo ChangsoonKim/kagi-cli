@@ -1,0 +1,11 @@
+.git
+.github
+target
+node_modules
+dist
+coverage
+.DS_Store
+*.log
+mcp-server/node_modules
+mcp-server/dist
+npm/vendor

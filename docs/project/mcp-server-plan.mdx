@@ -1,0 +1,262 @@
+---
+title: "MCP Server Plan"
+description: "Execution plan for adding an MCP server around the existing kagi CLI with minimal repo disruption."
+---
+
+# MCP Server Plan
+
+This document captures the recommended plan for adding an MCP server to this repository without destabilizing the current CLI.
+
+## Goals
+
+- add an MCP server that exposes the existing `kagi` capabilities to agent clients
+- keep the current Rust CLI as the source of truth
+- minimize changes to the existing repo structure and runtime behavior
+- make future updates cheap when the CLI surface changes
+
+## Non-Goals
+
+- do not refactor the current binary crate into a library as part of the first implementation
+- do not rewrite Kagi integrations in a second language
+- do not expand the product surface beyond what the CLI already supports for the first pass
+
+## Recommended Architecture
+
+The MCP server should be a thin adapter around the existing CLI.
+
+- add a standalone `mcp-server/` workspace directory
+- execute the local `kagi` binary as a subprocess
+- use JSON output only for machine-facing MCP tools
+- treat stdout, stderr, and exit status as the stable integration boundary
+- keep Kagi auth resolution inside the existing CLI and config flow
+
+This is the preferred first step because the current repo already has:
+
+- a well-defined command surface
+- JSON-first success output for most commands
+- documented output contracts
+- integration tests that validate the CLI boundary
+
+## Guardrails
+
+- never parse `pretty`, `markdown`, or `csv` output inside the MCP server
+- prefer one MCP tool per CLI command or subcommand
+- keep MCP argument names close to the existing CLI flag names
+- default the first release to read-only and low-risk tools
+- isolate MCP-specific normalization logic in the adapter instead of changing core Rust code
+
+## Phase Plan
+
+### Phase 0: Freeze Scope
+
+- define the first MCP tool set
+- define which commands remain excluded in v1
+- define binary resolution rules for local dev and packaged use
+- decide whether the MCP server is Node-based or Rust-based
+
+Recommended v1 scope:
+
+- `search`
+- `quick`
+- `summarize`
+- `assistant`
+- `assistant thread list`
+- `assistant thread get`
+- `assistant thread export`
+- `ask-page`
+- `translate`
+- `news`
+- `smallweb`
+- `fastgpt`
+- `enrich web`
+- `enrich news`
+
+Deferred from v1:
+
+- `auth` mutation flows
+- `assistant thread delete`
+- `lens` create or update flows
+- `bang custom` create or update flows
+- `redirect` create or update flows
+- `assistant custom` create or update flows
+- any file-upload workflow
+
+### Phase 1: Scaffold The MCP Server
+
+- create `mcp-server/` as a standalone package
+- add a minimal MCP server entrypoint
+- add a shared CLI runner module
+- add typed tool definitions and per-tool adapters
+- document how the MCP server finds the `kagi` binary
+
+Suggested layout:
+
+```text
+mcp-server/
+  package.json
+  tsconfig.json
+  src/
+    server.ts
+    runner.ts
+    tools/
+      search.ts
+      quick.ts
+      summarize.ts
+      assistant.ts
+      ask-page.ts
+      translate.ts
+      news.ts
+      smallweb.ts
+      fastgpt.ts
+      enrich.ts
+    schemas/
+    errors.ts
+  tests/
+```
+
+### Phase 2: Build The CLI Runner Boundary
+
+- resolve the binary path from `KAGI_BIN`, local build output, or `PATH`
+- execute subprocess commands with timeout control
+- capture stdout, stderr, and exit status
+- parse JSON success output
+- map CLI failures into stable MCP error objects
+- add explicit protection against accidental non-JSON output
+
+### Phase 3: Expose Read-Only MCP Tools
+
+- implement one adapter per CLI command
+- normalize MCP input into CLI arguments
+- validate tool arguments before spawning the CLI
+- return CLI JSON output with minimal reshaping
+- only add adapter-side normalization where MCP ergonomics clearly require it
+
+### Phase 4: Testing
+
+- add mock-driven tests for the MCP runner
+- add command-level adapter tests against mocked Kagi endpoints
+- reuse the existing base URL override pattern for local test servers
+- add smoke tests that verify expected JSON shape for every exposed tool
+- keep live-network behavior out of default MCP test runs
+
+### Phase 5: Documentation
+
+- document the MCP server architecture and local development flow
+- document supported tools and deferred tools
+- document auth expectations and required environment variables
+- document the update procedure when the CLI surface changes
+
+### Phase 6: Packaging And CI
+
+- add install and run instructions for the MCP server
+- add CI coverage for the MCP package
+- keep MCP build failures separate from core CLI build failures where possible
+- decide whether MCP shipping is tied to the main release or versioned independently
+
+## Implementation TODO
+
+### Repo Setup
+
+- [x] create `mcp-server/` package
+- [x] choose runtime and package manager
+- [x] add local run command
+- [x] add build command
+- [x] add test command
+
+### CLI Integration Boundary
+
+- [x] implement binary path resolution
+- [x] implement subprocess execution helper
+- [x] implement timeout handling
+- [x] implement JSON stdout parsing
+- [x] implement stderr and exit code error mapping
+- [x] reject non-JSON output for machine-facing tools
+
+### Tool Adapters
+
+- [x] add `search` tool
+- [x] add `quick` tool
+- [x] add `summarize` tool
+- [x] add `assistant` tool
+- [x] add `assistant_thread_list` tool
+- [x] add `assistant_thread_get` tool
+- [x] add `assistant_thread_export` tool
+- [x] add `ask_page` tool
+- [x] add `translate` tool
+- [x] add `news` tool
+- [x] add `smallweb` tool
+- [x] add `fastgpt` tool
+- [x] add `enrich_web` tool
+- [x] add `enrich_news` tool
+
+### Input Validation
+
+- [x] add shared schema validation for tool inputs
+- [x] mirror CLI validation rules where possible
+- [x] keep auth-specific validation delegated to the CLI
+- [ ] add tests for invalid argument handling
+
+### Testing
+
+- [x] add unit tests for CLI runner behavior
+- [x] add adapter tests for each tool
+- [x] add mock endpoint fixtures for `search`
+- [x] add mock endpoint fixtures for `news`
+- [x] add mock endpoint fixtures for `summarize`
+- [ ] add smoke tests for all exposed tools
+- [x] ensure default tests do not require real Kagi credentials
+
+### Documentation
+
+- [x] add MCP setup guide
+- [x] add tool inventory doc
+- [ ] add update playbook
+- [ ] add troubleshooting notes
+
+### CI
+
+- [x] add MCP install step in CI
+- [x] add MCP test step in CI
+- [x] add MCP lint or typecheck step
+
+## Update Strategy
+
+The main rule is simple: when the CLI changes, update the MCP adapter layer before changing core Rust internals.
+
+### When A New CLI Command Is Added
+
+- add a new MCP tool only if the command is machine-usable through JSON output
+- add a tool adapter without changing existing tool behavior
+- add one adapter test and one smoke test
+- update the MCP tool inventory doc
+
+### When Existing CLI Output Changes
+
+- update the relevant adapter parser or normalizer
+- update the MCP snapshot or JSON-shape tests
+- only change the Rust core if the CLI contract itself is incorrect
+
+### When Auth Rules Change
+
+- keep auth resolution in the CLI whenever possible
+- only update MCP error messaging and tool metadata
+- avoid duplicating credential precedence logic outside the CLI
+
+### When Packaging Changes
+
+- keep the MCP binary discovery code isolated in one place
+- do not spread path assumptions across tool adapters
+
+## Acceptance Criteria For V1
+
+- every exposed MCP tool works by invoking the existing `kagi` binary
+- no core Rust modules need to be imported by the MCP server
+- default MCP tests run without live Kagi credentials
+- MCP docs clearly state supported and deferred capabilities
+- a CLI update requires small adapter changes, not architectural rework
+
+## Future Upgrade Path
+
+If the adapter approach becomes too limiting, the next step should be a focused extraction of a reusable Rust library boundary.
+
+That should happen only after the MCP server proves which seams are stable and which outputs need stronger typed contracts.

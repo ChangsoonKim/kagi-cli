@@ -1,0 +1,99 @@
+---
+title: "MCP Server Runtime"
+description: "Supported tools, auth flow, and Docker deployment notes for the kagi MCP server."
+---
+
+# MCP Server Runtime
+
+The repository now includes a deployable MCP server under `mcp-server/`.
+
+## Transport
+
+The Docker-oriented deployment uses Streamable HTTP.
+
+- endpoint: `/mcp`
+- health check: `/healthz`
+- methods: `POST`, `GET`, `DELETE`
+
+## Authentication
+
+The HTTP server is intentionally **session-token-only**.
+
+- the first `initialize` request must include `Authorization: Bearer <KAGI_SESSION_TOKEN>`
+- the server stores that session token in the MCP session context
+- follow-up requests on the same MCP session reuse the stored token
+- `GET` and `DELETE` requests use the existing `mcp-session-id`
+
+This design keeps the deployment simple and aligns with the current request that the server should operate from a subscriber session token.
+
+## Supported Tools
+
+Session-compatible tools:
+
+- `kagi_search`
+- `kagi_quick`
+- `kagi_summarize`
+- `kagi_assistant_prompt`
+- `kagi_assistant_thread_list`
+- `kagi_assistant_thread_get`
+- `kagi_assistant_thread_export`
+- `kagi_ask_page`
+- `kagi_translate`
+
+Public tools:
+
+- `kagi_news`
+- `kagi_smallweb`
+
+## Intentionally Not Exposed In Session-Only HTTP Mode
+
+These require `KAGI_API_TOKEN`, so they are not registered in the Docker/HTTP runtime:
+
+- `kagi_fastgpt`
+- `kagi_enrich_web`
+- `kagi_enrich_news`
+
+`kagi_summarize` is also restricted to the subscriber summarizer path in session-only mode.
+
+## Local Run
+
+```bash
+cargo build
+cd mcp-server
+npm install
+npm run build
+npm start
+```
+
+The server listens on:
+
+```text
+http://0.0.0.0:3000/mcp
+```
+
+## Docker Build And Run
+
+Build from the repo root:
+
+```bash
+docker build -f mcp-server/Dockerfile -t kagi-cli-mcp .
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 3000:3000 kagi-cli-mcp
+```
+
+Then initialize the MCP session with a bearer token:
+
+```http
+Authorization: Bearer <KAGI_SESSION_TOKEN>
+```
+
+## Operational Notes
+
+- the MCP server shells out to the local `kagi` binary for every tool call
+- the Rust CLI remains the source of truth for auth rules and API behavior
+- default tests do not require real credentials
+- adapter integration tests run against mocked Kagi endpoints using the real local `kagi` binary
